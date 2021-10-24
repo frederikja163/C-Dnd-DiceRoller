@@ -4,8 +4,6 @@
 
 void make_roll(const char *);
 int calculate_value(int, const char *);
-int calculate_term(int, const char *);
-int calculate_factor(int, const char *);
 
 int main(int argc, char *argv[]) {
     if (argc <= 1) {
@@ -21,77 +19,71 @@ int main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
-void make_roll(const char *roll) {
-    printf("Roll %s=", roll);
+void make_roll(const char *expr) {
+    printf("Roll %s=", expr);
 
-    int size = strlen(roll);
+    int size = strlen(expr);
 
-    int value = calculate_value(size, roll);
+    int value = calculate_value(size, expr);
 
     printf("%i\n", value);
 }
 
-int calculate_value(int size, const char *roll) {
-    int currentValue = 0; int scope = 0; int i;
-    const char* termStart = roll;
-
-    /* Split roll into terms and add the terms together.*/
-    for (i = 0; i < size; i++, roll++) {
-        if (scope == 0 && i != 0 && (*roll == '+' || *roll == '-')) {
-            currentValue += calculate_term(roll - termStart, termStart);
-            termStart = roll;
+const char* _find_symbol_in_outer_scope(int size, const char *expr, char symb) {
+    int i; int scope = 0;
+    for (i = 0; i < size; i++) {
+        if (scope == 0 && *(expr + i) == symb) {
+            return expr + i;
         }
-        else if (*roll == '(') {
+        else if (*(expr + i) == '(') {
             scope += 1;
         }
-        else if (*roll == ')') {
+        else if (*(expr + i) == ')') {
             scope -= 1;
         }
     }
-    currentValue += calculate_term(size, termStart);
-
-    return currentValue;
+    return NULL;
 }
 
-int calculate_term(int size, const char *term) {
-    int termValue = 0; int scope = 0; int i;
-    const char *factorStart = term;
-
-    /* Split the term into factors and multiply/divide the factors together.*/
-    for (i = 0; i < size; i++, term++) {
-        if (scope == 0 && i != 0 && (*term == '*' || *term == '/')) {
-            if (*factorStart == '*') {
-                /*printf("%i*%i", termValue, atoi(factorStart));*/
-                termValue *= calculate_factor(size, factorStart);
-            }
-            else if (*factorStart == '/') {
-                termValue /= calculate_factor(size, factorStart);
-            }
-            else {
-                termValue = atoi(factorStart);
-            }
-            factorStart = term;
-        }
-        else if (*term == '(') {
-            scope += 1;
-        }
-        else if (*term == ')') {
-            scope -= 1;
-        }
+int _perform_symbol_check(int size, const char *expr, char symb, int *leftValue, int *rightValue) {
+    const char *ptr = _find_symbol_in_outer_scope(size, expr, symb);
+    if (ptr != NULL) {
+        int leftSize = ptr - expr;
+        *leftValue = calculate_value(leftSize, expr);
+        *rightValue = calculate_value(size - leftSize - 1, ptr + 1);
+        return 1;
     }
-    if (*factorStart == '*'){
-        termValue *= calculate_factor(size, factorStart + 1);
-    }
-    else if (*factorStart == '/') {
-        termValue /= calculate_factor(size, factorStart + 1);
-    }
-    else {
-        termValue = atoi(factorStart);
-    }
-
-    return termValue;
+    return 0;
 }
 
-int calculate_factor(int size, const char* factorStart) {
-    return atoi(factorStart);
+void print(int size, const char* expr) {
+    int i;
+    for (i = 0; i < size; i++) {
+        printf("%c", *(expr + i));
+    }
+}
+
+int calculate_value(int size, const char *expr) {
+    int leftValue; int rightValue;
+    if (_perform_symbol_check(size, expr, '+', &leftValue, &rightValue)) {
+        return leftValue + rightValue;
+    }
+    else if (_perform_symbol_check(size, expr, '-', &leftValue, &rightValue)) {
+        return leftValue - rightValue;
+    }
+    else if (_perform_symbol_check(size, expr, '%', &leftValue, &rightValue)) {
+        return leftValue % rightValue;
+    }
+    else if (_perform_symbol_check(size, expr, '/', &leftValue, &rightValue)) {
+        return leftValue / rightValue;
+    }
+    else if (_perform_symbol_check(size, expr, '*', &leftValue, &rightValue)) {
+        return leftValue * rightValue;
+    }
+    
+    if (*expr == '(' && *(expr + size - 1) == ')') {
+        return calculate_value(size - 2, expr + 1);
+    }
+
+    return atoi(expr);
 }
